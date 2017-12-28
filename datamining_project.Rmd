@@ -14,11 +14,8 @@ library(dplyr)
 original <- read.csv("C://Users//khatia//Desktop//dataminingpro//market_price.csv")
 ```
 
-
-
-
 ```{r}
-head(original,10)
+head(original,2)
 ```
 
 ```{r}
@@ -27,10 +24,10 @@ ncol(original)
 str(original)
 ```
 
-
 filtering the currencies not equal to euros
 ```{r}
 original<-filter(original, currency=="EUR")
+original<-filter(original,currency!="")
 ```
 
 
@@ -39,40 +36,34 @@ nrow(original)
 ```
 previously we had 19528358 rows, now it's 18544211
 
-now filtering unimportant rows like : id, broker_location_code, rc_location_code, excess_included:
-
 ```{r}
 original<-as.data.frame(original)
 head(original,5)
 ```
 
+now filtering unimportant rows like : id, broker_location_code, rc_location_code, excess_included:
 ```{r}
-original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included"))]
+original<-original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included", "source","broker","source_country", "supplier_name","currency"))]
 ```
 
+changing empty values in NA 
 ```{r}
-set.seed(1111)
-index<-sample(c(1:nrow(original)), size = 10000, replace = FALSE)
+original<-original$model_name[original$model_name==""]<-NA
+```
 
+filtering NA values
+```{r}
+original<-na.omit(original)
+```
+
+cleaning capitalization errors
+
+```{r}
+original$transmission[original$transmission=="AUTOMATIC"]<-"automatic"
+original$transmission[original$transmission=="MANUAL"]<-"manual"
 
 ```
 
-
-```{r}
-sampledrows<-original[index,]
-```
-
-
-
-```{r}
-
-
-```
-
-
-```{r}
-
-```
 
 
 
