@@ -1,0 +1,84 @@
+---
+title: "dataproject"
+author: "khatia kilanava"
+date: "December 27, 2017"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+```
+
+
+```{r}
+original <- read.csv("C://Users//khatia//Desktop//dataminingpro//market_price.csv")
+```
+
+
+
+
+```{r}
+head(original,10)
+```
+
+```{r}
+nrow(original)
+ncol(original)
+str(original)
+```
+
+
+filtering the currencies not equal to euros
+```{r}
+original<-filter(original, currency=="EUR")
+```
+
+
+```{r}
+nrow(original)
+```
+previously we had 19528358 rows, now it's 18544211
+
+now filtering unimportant rows like : id, broker_location_code, rc_location_code, excess_included:
+
+```{r}
+original<-as.data.frame(original)
+head(original,5)
+```
+
+```{r}
+original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included"))]
+```
+
+```{r}
+set.seed(1111)
+index<-sample(c(1:nrow(original)), size = 10000, replace = FALSE)
+
+
+```
+
+
+```{r}
+sampledrows<-original[index,]
+```
+
+
+
+```{r}
+
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
