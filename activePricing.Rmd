@@ -1,0 +1,29 @@
+## The goal is to find companies that uses active pricing.
+
+Find a frequency of changing prices for each supplier. So for each supplier, we calc changes_count. This number is a number of prices for each acriss_code of supplier. So if the prices appear the same for the same acriss_code during time (different requests), this number will be small. If price changes for each ACRISS code, then supplier changes prices often.
+
+```{r}
+library(dplyr)
+
+data <- read.csv("sample.csv")
+
+# cleaning columns
+d <- data[, c("acriss_code", "price_per_day", "supplier_name", "request_date")]
+
+changes <- d%>%
+  # for each supplier name
+  group_by(supplier_name) %>%
+  # for each accriss code within supplier
+  group_by(acriss_code, add=TRUE) %>%
+  # see how often prices were changed
+  mutate(changes_count=length(table(price_per_day))) %>%
+  ungroup() %>%
+  # how often supplier was requested
+  add_count(supplier_name) %>%
+  group_by(supplier_name) %>%
+  # sum all prices changes and divide by count of requests
+  summarize(total=sum(changes_count)/mean(n))
+
+# sort
+changes <- changes[order(changes$total, decreasing = T), ]
+```
