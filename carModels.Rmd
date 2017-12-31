@@ -48,3 +48,32 @@ true_acriss <-
     group_by(model) %>%
     summarise(acriss = names(which.max(table(acriss_code))))
 ```
+
+Let's try to build distance matrix using own function
+
+```{r}
+library(proxy)
+library(ggplot2)
+
+dist_data <-
+  data[, c("model_name", "acriss_code", "car_class_name", "transmission", "price_per_day", "currency")] %>%
+  filter(currency == "EUR") %>%
+  mutate(transmission = ifelse(transmission == "manual", 0, 1), model_name=sapply(model_name, get_model)) %>%
+  na.omit()
+
+dist_func <- function(x, y) {
+  acriss_x <- unlist(str_split(x$acriss_code, ""))
+  acriss_y <- unlist(str_split(y$acriss_code, ""))
+  acriss_diff <- Reduce(x=c(1:4), f=function(acc, i) {
+                  return(acc + ifelse(acriss_x[i] == acriss_y[i], 0, 1))
+                }, init=0)
+  model_diff <- length(setdiff(unlist(str_split(x$model_name, " ")), unlist(str_split(y$model_name, " "))))
+  model_diff = ifelse(model_diff < 3, 0, model_diff)
+  t_diff <- abs(x$transmission - y$transmission)
+  price_diff <- abs(x$price_per_day - y$price_per_day)
+  return (acriss_diff + model_diff + t_diff + price_diff)
+}
+
+dist_res <- proxy::dist(dist_data[1:10,], method = dist_func)
+
+```
