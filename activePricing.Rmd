@@ -8,22 +8,43 @@ library(dplyr)
 data <- read.csv("sample.csv")
 
 # cleaning columns
-d <- data[, c("acriss_code", "price_per_day", "supplier_name", "request_date")]
+d <- data[, c("acriss_code", "price_per_day", "supplier_name")]
 
-changes <- d%>%
-  # for each supplier name
-  group_by(supplier_name) %>%
-  # for each accriss code within supplier
-  group_by(acriss_code, add=TRUE) %>%
-  # see how often prices were changed
-  mutate(changes_count=length(table(price_per_day))) %>%
-  ungroup() %>%
-  # how often supplier was requested
-  add_count(supplier_name) %>%
-  group_by(supplier_name) %>%
-  # sum all prices changes and divide by count of requests
-  summarize(total=sum(changes_count)/mean(n))
-
-# sort
-changes <- changes[order(changes$total, decreasing = T), ]
+calc_coeficients <- function(data) {
+  
+  d <- data %>%
+    # for each supplier name
+    group_by(supplier_name) %>%
+    # for each accriss code within supplier
+    group_by(acriss_code, add=TRUE) %>%
+    # see how often prices were changed
+    mutate(changes_count=length(table(price_per_day))) %>%
+    ungroup() %>%
+    # how often supplier was requested
+    add_count(supplier_name) %>%
+    group_by(supplier_name) %>%
+    # sum all prices changes and divide by count of requests
+    summarize(total=sum(changes_count)/mean(n)) # divide by total number of rows?
+  
+  return (d[order(d$total, decreasing = T), ] )
+}
+changes <- calc_coeficients(data)
 ```
+
+### Let's test it. SUP2 didn't change prices for A2 cars. So it should have smaller coeficient.
+
+```{r}
+test_data <- data.frame(
+  acriss_code=c("A1", "A2", "A2", "A2", "A1", "A2", "A1", "A2", "A1", "A1"),
+  supplier_name=c("SUP1", "SUP2", "SUP2", "SUP2", "SUP1", "SUP2", "SUP1", "SUP2", "SUP2", "SUP2"),
+  price_per_day=c(12, 22, 22, 22, 13, 14, 15, 22, 12, 13)
+  )
+print(test_data[order(test_data$supplier_name),])
+```
+So, SUP1 changed price frequently, while SUP2 changed price only once for A1 ACRISS code and once for A2. SO SUP2 don't use active pricing.
+
+```{r}
+test_res <- calc_coeficients(test_data)
+print(test_res)
+```
+As result, SUP1 have higher coefficient. How it can be used? Say, this statistic can be updated every day/week/month to build target price using coeficients for supplier.
