@@ -1,0 +1,50 @@
+Some car model names written incorrect. That's the problem for correct model distinction (say, for price monitoring).
+Let's try to fix these names, so the same car models will have the same model_name.
+
+```{r}
+library(dplyr)
+library(stringr)
+
+data <- read.csv("sample.csv") # 1 000 000 rows
+
+# cleaning columns
+d <-data[, c("model_name", "acriss_code") ]
+
+# a map of pattern to replace and replacement
+replacements <- data.frame(
+  pattern=c("vw", "vauxhall", "vauxhall motors"),
+  replacement=c("volkswagen", "opel", "opel")
+)
+get_model <- function (name) {
+  # find index of ' or similar'
+  i <- str_locate(name, " or similar")
+  # find index of 'group - x '
+  if (grepl("^group ", name)) {
+    car <- str_sub(name, 11)
+  }
+  # cut this 'or similar'
+  car <- str_sub(name, 1, i - 1)[1]
+  if(is.na(car)) {
+    # sometimes happen
+    car = tolower(name)
+  } else {
+    # but still need to be lower cased
+    car = tolower(car)
+  }
+  # we replace each pattern occurance in a name
+  return (apply(replacements, 1, function(x) str_replace(car, x[1], x[2]))[1])
+}
+# and apply it for each car in data
+d$model <- sapply(na.omit(d$model_name), get_model)
+```
+
+Seems like a lot of websites have incorrect/own car model names. That's the problem that cannot be solved in manual way, like changing 'vw' to 'volkswagen'. Because we don't know when one of the suppliers will write again something own instead of model name.
+
+Let's at least check for a true ACRISS code for the car models. We will do this just by finding mode of acriss_code for each model.
+
+```{r}
+true_acriss <-
+  d %>%
+    group_by(model) %>%
+    summarise(acriss = names(which.max(table(acriss_code))))
+```
