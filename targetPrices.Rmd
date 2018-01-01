@@ -1,0 +1,84 @@
+Let's find target prices. This is cheapest top 10 average and top 5 percentile.
+
+```{r}
+library(dplyr)
+
+# read data
+data <- read.csv("sample.csv") # 1 000 000 rows
+# filter data
+d <- data %>%
+  select(model_name, acriss_code, car_class_name, transmission, price_per_day, currency) %>%
+  na.omit() %>%
+  filter(currency == "EUR") %>%
+  mutate(transmission = ifelse(transmission == "manual", 0, 1))
+```
+Not let's edit model names to assign acriss codes
+
+```{r}
+# function to do that
+get_model <- function (name) {
+  # find index of ' or similar'
+  i <- str_locate(name, " or similar")
+  # remove 'group - x ' if in name
+  if (grepl("^group ", name)) {
+    car <- str_sub(name, 11)
+  }
+  # cut this 'or similar'
+  car <- str_sub(name, 1, i - 1)[1]
+  if(is.na(car)) {
+    # sometimes happen
+    car = tolower(name)
+  } else {
+    # but still need to be lower cased
+    car = tolower(car)
+  }
+  return (car)
+}
+d$model_name <- sapply(d$model_name, get_model)
+```
+Now we try to assing 'correct' ACRISS codes just by getting it from mode of acriss_code for each model_name
+```{r}
+temp <- d %>%
+  group_by(model_name) %>%
+  mutate(acriss_code = names(which.max(table(acriss_code))))
+```
+Now we need to get rid of "anomalies" from "price_per_day". Some rows have values like 25 000 euro +. Per day. Really? For the same cars which have 90-100 euro price?
+```{r}
+#before
+temp %>%
+  filter(acriss_code %in% head(levels(as.factor(temp$acriss_code)), 20)) %>%
+  ggplot(aes(x=acriss_code, y=price_per_day, colour=acriss_code)) + geom_point()
+```
+Do you see this scale? We want to cut these anomalies.
+```{r}
+# plot again
+temp <- temp %>%
+  group_by(acriss_code) %>%
+  filter(price_per_day < quantile(price_per_day, c(.9)))
+
+temp %>%
+  filter(acriss_code %in% head(levels(as.factor(temp$acriss_code)), 20)) %>%
+  ggplot(aes(x=acriss_code, y=price_per_day, colour=acriss_code)) + geom_point()
+```
+Much better. Now we can find target prices for each ACRISS code
+```{r}
+# top 10 cheapest average
+tp <- temp %>%
+  group_by(acriss_code) %>%
+  summarise(top10avg_price = mean(head(order(price_per_day, decreasing = F ), 10)))
+
+# percentile
+tp_percentile <- temp %>%
+  group_by(acriss_code) %>%
+  summarize(target_price = quantile(order(price_per_day, decreasing=F), probs=0.95))
+
+# 
+tp_top5percent <- temp %>%
+  group_by(acriss_code) %>%
+  summarize(target_price = mean(head(order(price_per_day, decreasing = F), ceiling(n() * 0.05))))
+
+tp$top5_percentile <- tp_percentile$target_price
+tp$top5_percent <- tp_top5percent$target_price
+```
+So for each ACRISS code we have target price - price, that one should set for his car to be in the cheapest top 5%, top 10 or in 5 percentile.
+
