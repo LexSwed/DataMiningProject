@@ -1,0 +1,316 @@
+---
+title: "dataminingpro"
+author: "khatia kilanava"
+date: "January 1, 2018"
+output: html_document
+---
+```{r}
+library(dplyr)
+```
+#-----------------------  data cleaning --------------------------------------------------------------------------------------------
+
+```{r}
+original <- read.csv("sample.csv")
+
+```
+sampling the data more .
+
+```{r}
+
+original<-sample_n(original,10000 )
+```
+inspefting what we have.
+```{r}
+head(original,2)
+```
+
+```{r}
+nrow(original)
+ncol(original)
+str(original)
+```
+Filtering the rows, which are not in euros, those that are empty and also unnecassary columns.
+
+```{r}
+original<-filter(original, currency=="EUR")
+original<-filter(original,currency!="")
+```
+
+```{r}
+original<-original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included", "source","broker","source_country", "supplier_name","currency", "X", "id", "request_date", "pickup_time", "return_time","rental_days","destination_country", "total_price"))]
+```
+
+Get rid of capitalization problems.
+
+```{r}
+original$transmission[original$transmission=="AUTOMATIC"]<-"automatic"
+original$transmission[original$transmission=="MANUAL"]<-"manual"
+
+```
+
+
+
+#------------------------------------------- data cleaning end  -------------------------------------------------------------------------
+
+```{r}
+head(original,2)
+```
+
+```{r}
+#just copying
+data<-original
+```
+
+```{r}
+library(stringr)
+```
+
+```{r}
+# cleaning columns
+d <-data[, c("model_name", "acriss_code") ]
+head(d,200)
+```
+
+```{r}
+replacements <- data.frame(
+  pattern=c("vw", "vauxhall", "vauxhall motors"),
+  replacement=c("volkswagen", "opel", "opel")
+)
+
+
+
+```
+
+  -- ----Cleaning the models(Alexander part)------------------------------------------------------------
+```{r}
+get_model <- function (name) {
+  # find index of ' or similar'
+  i <- str_locate(name, " or similar")
+  # find index of 'group - x '
+  if (grepl("^group ", name)) {
+    car <- str_sub(name, 11)
+  }
+  # cut this 'or similar'
+  car <- str_sub(name, 1, i - 1)[1]
+  if(is.na(car)) {
+    # sometimes happen
+    car = tolower(name)
+  } else {
+    # but still need to be lower cased
+    car = tolower(car)
+  }
+  # we replace each pattern occurance in a name
+  return (car)
+}
+```
+
+calling the function. (Alexander part)
+```{r}
+d$model <- sapply(na.omit(d$model_name), get_model)
+```
+
+```{r}
+head(d,10)
+```
+
+---------------- getting True accriss codes(Alexander part)-------------------------------------------------------------------------------
+```{r}
+true_acriss <-
+  d %>%
+    group_by(model) %>%
+    summarise(acriss = names(which.max(table(acriss_code))))
+```
+
+binding model to the original data.
+
+```{r}
+original<-cbind(data,model=d$model)
+
+
+```
+
+```{r}
+head(original,3)
+```
+
+```{r}
+original<-original[,-3]
+```
+we want to get rid of this anomalies. As you can se from the plot, little points that are far away, not following general view of plot.
+```{r}
+#before
+original %>%
+  filter(acriss_code %in% head(levels(as.factor(original$acriss_code)), 20)) %>%
+  ggplot(aes(x=acriss_code, y=price_per_day, colour=acriss_code)) + geom_point()
+```
+Lets do it !!!
+
+
+```{r}
+original <- original %>%
+  group_by(acriss_code) %>%
+  filter(price_per_day < quantile(price_per_day, c(.9)))
+
+  original<-original %>%
+  filter(acriss_code %in% head(levels(as.factor(original$acriss_code)), 20)) 
+  
+  original  %>% ggplot(aes(x=acriss_code, y=price_per_day, colour=acriss_code)) + geom_point()
+
+
+```
+ these is better.
+
+
+```{r}
+
+
+head(original,3)
+#copy data just in case 
+copied<-original
+```
+
+
+```{r}
+#install.packages("factoextra")
+#install.packages("cluster")
+#install.packages("magrittr")
+```
+
+
+
+```{r}
+library("cluster")
+library("factoextra")
+library("magrittr")
+```
+```{r}
+head(original,5)
+
+```
+
+
+```{r}
+
+# let's try on 50 accris code to let the program go faster
+ original<-original %>%
+  filter( acriss_code %in% head(levels(acriss_code), 60))
+
+```
+
+```{r}
+nrow(original)
+#write.table(original, file = "foo.csv", sep = ",", col.names = NA,
+#            qmethod = "double")
+```
+
+
+```{r}
+# from factor into numeric
+matrix<-data.matrix(original, rownames.force = NA)
+
+
+```
+
+```{r} 
+matrix<-scale(matrix)   #needed for clustering
+```
+
+```{r}
+library("factoextra")
+```
+
+
+```{r}
+mat<-matrix[,-2]
+mat
+```
+
+```{r}
+#get cluster tendency  is the data clustarable ? if the value is close to zero then it is
+gradient.color <- list(low = "steelblue",  high = "white")
+mat %>%    
+
+  get_clust_tendency(n = 50, gradient = gradient.color)
+
+
+```
+
+```{r}
+# recommend me how many clusters must I have?
+fviz_nbclust(mat, kmeans, method = "gap_stat")
+```
+
+
+# as it seen we are recommended to have 4
+
+
+```{r}
+# now doing kmeans clustering
+set.seed(123)
+km.res <- kmeans(mat, 5, nstart = 25)
+
+
+
+```
+
+
+
+
+```{r}
+
+library(fpc)
+library(cluster)
+```
+
+```{r}
+#visualisation of our cluster
+km.res <- kmeans(mat, 5)
+fviz_cluster(list(data = mat, cluster = km.res$cluster),
+             frame.type = "norm", geom = "point", stand = FALSE)
+
+
+```
+
+```{r}
+library(cluster)
+```
+
+```{r}
+out <- cbind(original, clusterNum = km.res$cluster)
+head(out,10)
+```
+
+```{r}
+#group by cluster and find out top 5 best price
+# top 10 cheapest average
+tp <- out %>%
+  group_by(clusterNum) %>%
+  summarise(top10avg_price = mean(head(sort(price_per_day, decreasing = F ), 10)))
+
+# percentile
+tp_percentile <- out %>%
+  group_by(clusterNum) %>%
+  summarize(target_price_percentile = quantile(sort(price_per_day, decreasing=F), probs=0.95))
+
+# 
+tp_top5percent <- out %>%
+  group_by(clusterNum) %>%
+  summarize(target_price_top5 = mean(head(sort(price_per_day, decreasing = F), ceiling(n() * 0.05))))
+
+tp
+tp_percentile
+tp_top5percent
+```
+
+```{r}
+library(dplyr)
+filtered<-filter(out,clusterNum==5)
+filtered
+```
+
+```{r}
+accris_code_5<-filtered$acriss_code
+accris_code_5
+```
+
+
