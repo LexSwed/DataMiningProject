@@ -1,0 +1,70 @@
+---
+title: "present"
+author: "Girogi Sheklashvili"
+date: "January 2, 2018"
+output: pdf_document
+---
+In this file Im trying to repeate clustering method which is already sued by ratechain, In order to compare it with our clustering
+```{r}
+library(dplyr)
+library(stringr)
+```
+
+```{r}
+original <- read.csv("C:/Users/giusha9/Desktop/sample.csv")
+head(original,2)
+```
+```{r}
+original<-dplyr::filter(original, currency=="EUR")
+original<-as.data.frame(original)
+```
+```{r}
+original<-original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included", "source","broker","source_country", "supplier_name","currency"))]
+```
+
+function for clustering only with acriss code and gearbox(result 3 clusters)
+```{r}
+acriss_func <- function(x, y) {
+  acriss_x <- unlist(str_split(x$acriss_code, ""))[1]
+  acriss_y <- unlist(str_split(y$acriss_code, ""))[1]
+   
+  acriss_diff <- ifelse(acriss_x == acriss_y, 0, 1)
+  t_diff <- abs(x$transmission - y$transmission)
+  return (acriss_diff+t_diff)
+}
+
+```
+
+```{r}
+data<-original%>%na.omit()%>%mutate(transmission = ifelse(transmission == "manual", 0, 1))
+
+```
+distance matrix for rows
+```{r}
+
+dist_res <- proxy::dist(original[1:10,], method = acriss_func)
+dist_res
+```
+```{r}
+data<-data[ , !(colnames(data) %in% c("X","id","request_date","pickup_date","pickup_time","return_time","rental_days","destination_country","car_class_name","model_name","total_price","price_per_day"))]
+data$acriss_code<-substring(data$acriss_code,1,1)
+
+```
+exporting data with only acriss code first letter and gearbox type
+```{r}
+write.csv(data,"C:/Users/giusha9/Desktop/data.csv")
+
+```
+read it again without header
+```{r}
+withoutHeader <- read.csv("C:/Users/giusha9/Desktop/data.csv",header = FALSE)
+```
+remove first column
+```{r}
+withoutHeader<-withoutHeader[, -1]
+```
+counting unique rows and running kmeans
+```{r}
+unique(withoutHeader)
+kmeans(withoutHeader[2:1000001,],35)
+```
