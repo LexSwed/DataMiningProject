@@ -1,0 +1,16 @@
+Price difference between car classes
+
+```{r}
+library(dplyr)
+
+data <- read.csv("./sample.csv")
+
+d <- data %>% select(acriss_code, price_per_day)
+
+res <- d %>%
+  group_by(acriss_code) %>%
+  summarize(price_mean=mean(price_per_day))
+
+```
+
+This table shows which classes have which average price.
