@@ -1,0 +1,123 @@
+---
+title: "present"
+author: "Girogi Sheklashvili"
+date: "January 2, 2018"
+output: pdf_document
+---
+In this file Im trying to repeate clustering method which is already sued by ratechain, In order to compare it with our clustering
+```{r}
+library(dplyr)
+library(stringr)
+#install.packages("factoextra")
+library("factoextra")
+```
+
+```{r}
+original <- read.csv("C:/Users/giusha9/Desktop/sample.csv")
+original<-sample_n(original,10000 )
+head(original,2)
+```
+```{r}
+original<-dplyr::filter(original, currency=="EUR")
+original<-as.data.frame(original)
+```
+```{r}
+original<-original[, !(colnames(original) %in% c("broker_location_code","rc_location_code","excess_included", "source","broker","source_country", "supplier_name","currency"))]
+
+```
+
+#function for clustering only with acriss code and gearbox(result 3 clusters)
+#```{r}
+#acriss_func <- function(x, y) {
+#  acriss_x <- unlist(str_split(x$acriss_code, ""))[1]
+#  acriss_y <- unlist(str_split(y$acriss_code, ""))[1]
+#  acriss_diff <- ifelse(acriss_x == acriss_y, 0, 1)
+#  t_diff <- abs(x$transmission - y$transmission)
+#  return (acriss_diff+t_diff)
+#}
+#```
+
+```{r}
+data<-original%>%na.omit()%>%mutate(transmission = ifelse(transmission == "manual", 0, 1))
+
+```
+#distance matrix for rows(not using)
+#```{r}
+#dist_res <- proxy::dist(original[1:10,], method = acriss_func)
+#dist_res
+#```
+```{r}
+data<-data[ , !(colnames(data) %in% c("X","id","request_date","pickup_date","pickup_time","return_time","rental_days","destination_country","car_class_name","model_name","total_price","price_per_day"))]
+data$acriss_code<-substring(data$acriss_code,1,1)
+
+```
+#exporting data with only acriss code first letter and gearbox type
+```{r}
+#write.csv(data,"C:/Users/giusha9/Desktop/data.csv")
+```
+read it again without header
+```{r}
+withoutHeader <- read.csv("C:/Users/giusha9/Desktop/data.csv",header = FALSE)
+```
+remove first column and row(first column is acriss code first letter, second is gearbox type)
+```{r}
+withoutHeader<-withoutHeader[-1, -1]
+```
+
+```{r}
+matrix<-data.matrix(withoutHeader, rownames.force = NA)
+```
+
+
+```{r}
+set.seed(123)
+matrix.scaled<-scale(matrix)
+```
+
+running kmeans
+```{r}
+km.res<-kmeans(matrix,5)
+```
+
+visualisation of clusters
+```{r}
+fviz_cluster( km.res ,matrix,
+             ellipse.type = "norm", geom = "point")
+
+```
+
+
+
+```{r}
+original<-original%>%na.omit()%>%mutate(transmission = ifelse(transmission == "manual", 0, 1))
+out <- cbind(original, clusterNum = km.res$cluster)
+#group by cluster and find out top 5 best price
+# top 10 cheapest average
+tp <- out %>%
+  group_by(clusterNum) %>%
+  summarise(top10avg_price = mean(head(sort(price_per_day, decreasing = F ), 10)))
+
+# percentile
+tp_percentile <- out %>%
+  group_by(clusterNum) %>%
+  summarize(target_price_percentile = quantile(sort(price_per_day, decreasing=F), probs=0.95))
+
+# 
+tp_top5percent <- out %>%
+  group_by(clusterNum) %>%
+  summarize(target_price_top5 = mean(head(sort(price_per_day, decreasing = F), ceiling(n() * 0.05))))
+
+tp
+tp_percentile
+tp_top5percent
+```
+```{r}
+library(dplyr)
+filtered<-filter(out,clusterNum==5)
+accris_code_5<-filtered$acriss_code
+```
+```{r}
+out[which(out$acriss_code == "CDAD"), ]
+```
+
+
